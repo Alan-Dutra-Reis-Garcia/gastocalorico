@@ -3,27 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora Fitness - Gasto Calórico e Performance</title>
+    <title>Calculadora Fitness - Sugestão Inteligente</title>
     
-    <!-- Tailwind CSS (Estilos) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- React e ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     
-    <!-- Babel (para entender o código React no navegador) -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Fonte Inter (Opcional, para ficar bonito) -->
+    <!-- Fonte Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     
     <style>
         body { font-family: 'Inter', sans-serif; }
         .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .8; }
         }
     </style>
 </head>
@@ -34,7 +39,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- Ícones SVG (Substituindo a biblioteca externa para facilitar o uso em HTML único) ---
+        // --- Ícones SVG ---
         const IconBike = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
         );
@@ -62,41 +67,137 @@
         const IconActivity = ({ className }) => (
              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         );
+        const IconTarget = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        );
+        const IconArrowUp = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        );
+        const IconDrop = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>
+        );
 
+        // --- Lógica de METs ---
+        const getMET = (act, speedKmh) => {
+            if (act === 'cycling') {
+                if (speedKmh < 16) return 4.0; 
+                if (speedKmh < 19) return 6.0; 
+                if (speedKmh < 22) return 8.0; 
+                if (speedKmh < 25) return 10.0;
+                return 12.0; 
+            } else if (act === 'walking') {
+                if (speedKmh < 3.2) return 2.0;
+                if (speedKmh < 4.8) return 3.3;
+                if (speedKmh < 6.4) return 5.0;
+                return 7.0; 
+            } else if (act === 'running') {
+                if (speedKmh < 8) return 6.0;
+                if (speedKmh < 9.6) return 8.3;
+                if (speedKmh < 11.2) return 10.5;
+                if (speedKmh < 12.8) return 11.8;
+                if (speedKmh < 14.5) return 12.8;
+                return 14.5; 
+            }
+            return 1;
+        };
+
+        // Função auxiliar para encontrar o próximo "degrau" de MET
+        const getNextTierSpeed = (act, currentSpeed) => {
+            const thresholds = {
+                cycling: [16, 19, 22, 25, 30],
+                walking: [3.2, 4.8, 6.4, 8],
+                running: [8, 9.6, 11.2, 12.8, 14.5, 18]
+            };
+            const tiers = thresholds[act] || [];
+            return tiers.find(t => t > currentSpeed) || null;
+        };
+
+        // --- Componente de Sugestão ---
+        const SuggestionCard = ({ currentData, activity }) => {
+            const { speed, calories, time, weight } = currentData;
+            const currentSpeedNum = parseFloat(speed);
+            const nextThreshold = getNextTierSpeed(activity, currentSpeedNum);
+            let suggestion = null;
+
+            if (nextThreshold && (nextThreshold - currentSpeedNum) <= 2.5) {
+                const targetSpeed = nextThreshold + 0.1; 
+                const targetDistance = (targetSpeed * (time / 60)).toFixed(2);
+                const newMet = getMET(activity, targetSpeed);
+                const newCalories = Math.round(newMet * weight * (time / 60));
+                const diffCal = newCalories - calories;
+                
+                suggestion = {
+                    type: 'INTENSITY',
+                    title: 'Aumente a Intensidade',
+                    text: `Se você atingir ${targetDistance} km no mesmo tempo, seu metabolismo sobe de nível.`,
+                    targetVal: targetDistance + ' km',
+                    extraBurn: diffCal
+                };
+            } else {
+                const targetDistance = (currentData.distance * 1.15).toFixed(2);
+                const targetSpeed = targetDistance / (time / 60);
+                const newMet = getMET(activity, targetSpeed);
+                const newCalories = Math.round(newMet * weight * (time / 60));
+                const diffCal = newCalories - calories;
+
+                suggestion = {
+                    type: 'VOLUME',
+                    title: 'Desafio de Distância',
+                    text: `Tente chegar a ${targetDistance} km mantendo o tempo atual para queimar mais.`,
+                    targetVal: targetDistance + ' km',
+                    extraBurn: diffCal
+                };
+            }
+
+            if (!suggestion || suggestion.extraBurn <= 0) return null;
+
+            return (
+                <div className="mt-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-1 shadow-lg transform transition-all hover:scale-[1.02]">
+                    <div className="bg-white rounded-lg p-4 h-full relative overflow-hidden">
+                        <div className="absolute -right-4 -top-4 text-indigo-50 opacity-20 transform rotate-12">
+                            <IconTarget className="w-32 h-32" />
+                        </div>
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="bg-indigo-100 text-indigo-700 p-1.5 rounded-lg">
+                                        <IconTrending className="w-5 h-5" />
+                                    </span>
+                                    <div>
+                                        <h3 className="font-bold text-indigo-900 text-sm uppercase tracking-wide">{suggestion.title}</h3>
+                                        <p className="text-[10px] text-indigo-400 font-semibold">SUGESTÃO INTELIGENTE</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="block text-2xl font-bold text-green-600">+{suggestion.extraBurn}</span>
+                                    <span className="text-[10px] text-gray-400 uppercase font-bold">kcal extras</span>
+                                </div>
+                            </div>
+                            <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+                                {suggestion.text}
+                            </p>
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 flex items-center justify-between">
+                                <div className="text-xs text-slate-500 font-medium">Nova Meta:</div>
+                                <div className="flex items-center gap-2 text-indigo-600 font-bold text-lg">
+                                    {suggestion.targetVal}
+                                    <IconArrowUp className="w-4 h-4 animate-bounce" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         // --- Componente Principal ---
         const FitnessCalculator = () => {
             const [activity, setActivity] = useState('walking');
             const [weight, setWeight] = useState(70);
             const [distance, setDistance] = useState(5);
-            const [time, setTime] = useState(60); // em minutos
+            const [time, setTime] = useState(60); 
             const [results, setResults] = useState(null);
 
             const CALORIES_PER_KG_FAT = 7700; 
-
-            // Lógica de METs (Intensidade Metabólica)
-            const getMET = (act, speedKmh) => {
-                if (act === 'cycling') {
-                    if (speedKmh < 16) return 4.0; 
-                    if (speedKmh < 19) return 6.0; 
-                    if (speedKmh < 22) return 8.0; 
-                    if (speedKmh < 25) return 10.0;
-                    return 12.0; 
-                } else if (act === 'walking') {
-                    if (speedKmh < 3.2) return 2.0;
-                    if (speedKmh < 4.8) return 3.3;
-                    if (speedKmh < 6.4) return 5.0;
-                    return 7.0; 
-                } else if (act === 'running') {
-                    if (speedKmh < 8) return 6.0;
-                    if (speedKmh < 9.6) return 8.3;
-                    if (speedKmh < 11.2) return 10.5;
-                    if (speedKmh < 12.8) return 11.8;
-                    if (speedKmh < 14.5) return 12.8;
-                    return 14.5; 
-                }
-                return 1;
-            };
 
             useEffect(() => {
                 calculateMetrics();
@@ -111,55 +212,40 @@
                 const durationHours = time / 60;
                 const speedKmh = distance / durationHours;
                 
-                // Cálculo Pace
                 const paceTotalMinutes = time / distance;
                 const paceMin = Math.floor(paceTotalMinutes);
                 const paceSec = Math.round((paceTotalMinutes - paceMin) * 60);
-                // Formatação segura para Pace (evita NaN)
                 const paceFormatted = isFinite(paceMin) ? `${paceMin}'${paceSec < 10 ? '0' : ''}${paceSec}"` : "--";
 
                 const met = getMET(activity, speedKmh);
                 const caloriesBurned = Math.round(met * weight * durationHours);
                 const weightLossGrams = (caloriesBurned / CALORIES_PER_KG_FAT) * 1000;
+                
+                // Novo cálculo: Kcal por Km
+                const kcalPerKm = distance > 0 ? Math.round(caloriesBurned / distance) : 0;
 
                 setResults({
                     speed: isFinite(speedKmh) ? speedKmh.toFixed(1) : "0.0",
                     pace: paceFormatted,
                     calories: isNaN(caloriesBurned) ? 0 : caloriesBurned,
                     weightLoss: isNaN(weightLossGrams) ? 0 : weightLossGrams.toFixed(0),
-                    met: met
+                    kcalPerKm: kcalPerKm,
+                    met: met,
+                    distance: distance,
+                    time: time,
+                    weight: weight
                 });
             };
 
             const activityConfig = {
-                cycling: {
-                    label: 'Ciclismo',
-                    Icon: IconBike,
-                    color: 'bg-blue-500',
-                    textColor: 'text-blue-600',
-                    metric: 'speed'
-                },
-                walking: {
-                    label: 'Caminhada',
-                    Icon: IconWalk,
-                    color: 'bg-green-500',
-                    textColor: 'text-green-600',
-                    metric: 'pace'
-                },
-                running: {
-                    label: 'Corrida',
-                    Icon: IconRun,
-                    color: 'bg-orange-500',
-                    textColor: 'text-orange-600',
-                    metric: 'pace'
-                }
+                cycling: { label: 'Ciclismo', Icon: IconBike, color: 'bg-blue-500', textColor: 'text-blue-600', metric: 'speed' },
+                walking: { label: 'Caminhada', Icon: IconWalk, color: 'bg-green-500', textColor: 'text-green-600', metric: 'pace' },
+                running: { label: 'Corrida', Icon: IconRun, color: 'bg-orange-500', textColor: 'text-orange-600', metric: 'pace' }
             };
-
-            const CurrentIcon = activityConfig[activity].Icon;
 
             return (
                 <div className="min-h-screen flex items-center justify-center p-4">
-                    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+                    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden mb-10">
                         
                         {/* Header */}
                         <div className={`p-6 ${activityConfig[activity].color} text-white text-center transition-colors duration-300`}>
@@ -170,7 +256,7 @@
                             <p className="opacity-90 mt-1 text-sm">Gasto calórico e performance</p>
                         </div>
 
-                        {/* Seletor de Atividade */}
+                        {/* Seletor */}
                         <div className="flex p-2 bg-slate-50 border-b border-slate-200">
                             {Object.keys(activityConfig).map((key) => {
                                 const BtnIcon = activityConfig[key].Icon;
@@ -193,7 +279,6 @@
                         </div>
 
                         <div className="p-6 space-y-6">
-                            
                             {/* Inputs */}
                             <div className="space-y-4">
                                 <div>
@@ -239,7 +324,7 @@
                                 <div className="space-y-4 animate-fade-in">
                                     <div className="h-px bg-slate-100 my-4"></div>
                                     
-                                    {/* Card Principal: Calorias */}
+                                    {/* Card Calorias */}
                                     <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
                                         <div className="absolute top-0 right-0 p-4 opacity-10">
                                             <IconFlame className="w-24 h-24" />
@@ -256,10 +341,9 @@
                                         </div>
                                     </div>
 
-                                    {/* Cards Secundários */}
+                                    {/* Grid Secundário */}
                                     <div className="grid grid-cols-2 gap-3">
-                                        
-                                        {/* Velocidade ou Pace */}
+                                        {/* Velocidade/Pace */}
                                         {activityConfig[activity].metric === 'speed' ? (
                                             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex flex-col justify-center">
                                                 <div className="flex items-center gap-2 text-blue-600 mb-1">
@@ -294,6 +378,25 @@
                                             <span className="text-xs text-slate-500">MET: {results.met}</span>
                                         </div>
                                     </div>
+
+                                    {/* Nova Métrica: Gasto por KM */}
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-orange-100 rounded-lg text-orange-600">
+                                                <IconDrop className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Kcal por Km</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right flex items-baseline gap-1">
+                                            <span className="text-xl font-bold text-slate-700">{results.kcalPerKm}</span>
+                                            <span className="text-xs text-slate-400">kcal/km</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Sugestão Inteligente */}
+                                    <SuggestionCard currentData={results} activity={activity} />
 
                                 </div>
                             ) : (
