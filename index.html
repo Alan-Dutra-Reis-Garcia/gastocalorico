@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Fitness - Gasto Calórico e Performance</title>
+    
+    <!-- Tailwind CSS (Estilos) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React e ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel (para entender o código React no navegador) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Fonte Inter (Opcional, para ficar bonito) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- Ícones SVG (Substituindo a biblioteca externa para facilitar o uso em HTML único) ---
+        const IconBike = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
+        );
+        const IconWalk = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 11 3.8 11 5v5.5c0 .83.67 1.5 1.5 1.5h.75c.83 0 1.5-.67 1.5-1.5V6c0-1.11-.89-2-2-2h-1"/><path d="M14 14v7h-2v-4l-4-3 2-4h3l1 3 4 1v4h-2v-3z"/></svg>
+        );
+        const IconRun = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        );
+        const IconTimer = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        );
+        const IconScale = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+        );
+        const IconFlame = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.243-2.143.5-3.5a6 6 0 1 0 6 6z"/><path d="M12 14v-2"/></svg>
+        );
+        const IconZap = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        );
+        const IconTrending = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        );
+        const IconActivity = ({ className }) => (
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        );
+
+
+        // --- Componente Principal ---
+        const FitnessCalculator = () => {
+            const [activity, setActivity] = useState('walking');
+            const [weight, setWeight] = useState(70);
+            const [distance, setDistance] = useState(5);
+            const [time, setTime] = useState(60); // em minutos
+            const [results, setResults] = useState(null);
+
+            const CALORIES_PER_KG_FAT = 7700; 
+
+            // Lógica de METs (Intensidade Metabólica)
+            const getMET = (act, speedKmh) => {
+                if (act === 'cycling') {
+                    if (speedKmh < 16) return 4.0; 
+                    if (speedKmh < 19) return 6.0; 
+                    if (speedKmh < 22) return 8.0; 
+                    if (speedKmh < 25) return 10.0;
+                    return 12.0; 
+                } else if (act === 'walking') {
+                    if (speedKmh < 3.2) return 2.0;
+                    if (speedKmh < 4.8) return 3.3;
+                    if (speedKmh < 6.4) return 5.0;
+                    return 7.0; 
+                } else if (act === 'running') {
+                    if (speedKmh < 8) return 6.0;
+                    if (speedKmh < 9.6) return 8.3;
+                    if (speedKmh < 11.2) return 10.5;
+                    if (speedKmh < 12.8) return 11.8;
+                    if (speedKmh < 14.5) return 12.8;
+                    return 14.5; 
+                }
+                return 1;
+            };
+
+            useEffect(() => {
+                calculateMetrics();
+            }, [activity, weight, distance, time]);
+
+            const calculateMetrics = () => {
+                if (weight <= 0 || distance <= 0 || time <= 0) {
+                    setResults(null);
+                    return;
+                }
+
+                const durationHours = time / 60;
+                const speedKmh = distance / durationHours;
+                
+                // Cálculo Pace
+                const paceTotalMinutes = time / distance;
+                const paceMin = Math.floor(paceTotalMinutes);
+                const paceSec = Math.round((paceTotalMinutes - paceMin) * 60);
+                // Formatação segura para Pace (evita NaN)
+                const paceFormatted = isFinite(paceMin) ? `${paceMin}'${paceSec < 10 ? '0' : ''}${paceSec}"` : "--";
+
+                const met = getMET(activity, speedKmh);
+                const caloriesBurned = Math.round(met * weight * durationHours);
+                const weightLossGrams = (caloriesBurned / CALORIES_PER_KG_FAT) * 1000;
+
+                setResults({
+                    speed: isFinite(speedKmh) ? speedKmh.toFixed(1) : "0.0",
+                    pace: paceFormatted,
+                    calories: isNaN(caloriesBurned) ? 0 : caloriesBurned,
+                    weightLoss: isNaN(weightLossGrams) ? 0 : weightLossGrams.toFixed(0),
+                    met: met
+                });
+            };
+
+            const activityConfig = {
+                cycling: {
+                    label: 'Ciclismo',
+                    Icon: IconBike,
+                    color: 'bg-blue-500',
+                    textColor: 'text-blue-600',
+                    metric: 'speed'
+                },
+                walking: {
+                    label: 'Caminhada',
+                    Icon: IconWalk,
+                    color: 'bg-green-500',
+                    textColor: 'text-green-600',
+                    metric: 'pace'
+                },
+                running: {
+                    label: 'Corrida',
+                    Icon: IconRun,
+                    color: 'bg-orange-500',
+                    textColor: 'text-orange-600',
+                    metric: 'pace'
+                }
+            };
+
+            const CurrentIcon = activityConfig[activity].Icon;
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+                        
+                        {/* Header */}
+                        <div className={`p-6 ${activityConfig[activity].color} text-white text-center transition-colors duration-300`}>
+                            <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
+                                <IconActivity className="w-6 h-6" />
+                                Calculadora Fitness
+                            </h1>
+                            <p className="opacity-90 mt-1 text-sm">Gasto calórico e performance</p>
+                        </div>
+
+                        {/* Seletor de Atividade */}
+                        <div className="flex p-2 bg-slate-50 border-b border-slate-200">
+                            {Object.keys(activityConfig).map((key) => {
+                                const BtnIcon = activityConfig[key].Icon;
+                                return (
+                                    <button
+                                        key={key}
+                                        onClick={() => setActivity(key)}
+                                        className={`flex-1 flex flex-col items-center justify-center py-3 rounded-xl transition-all duration-200 gap-1
+                                            ${activity === key 
+                                            ? 'bg-white shadow-md text-slate-800 font-semibold ring-1 ring-black/5' 
+                                            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+                                    >
+                                        <div className={activity === key ? activityConfig[key].textColor : ''}>
+                                            <BtnIcon className="w-6 h-6" />
+                                        </div>
+                                        <span className="text-xs">{activityConfig[key].label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            
+                            {/* Inputs */}
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-1">
+                                        <IconScale className="w-4 h-4" /> Peso Corporal (kg)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={weight}
+                                        onChange={(e) => setWeight(Number(e.target.value))}
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-1">
+                                            <IconTrending className="w-4 h-4" /> Distância (km)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={distance}
+                                            onChange={(e) => setDistance(Number(e.target.value))}
+                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-500 mb-1">
+                                            <IconTimer className="w-4 h-4" /> Tempo (min)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={time}
+                                            onChange={(e) => setTime(Number(e.target.value))}
+                                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Resultados */}
+                            {results ? (
+                                <div className="space-y-4 animate-fade-in">
+                                    <div className="h-px bg-slate-100 my-4"></div>
+                                    
+                                    {/* Card Principal: Calorias */}
+                                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                                            <IconFlame className="w-24 h-24" />
+                                        </div>
+                                        <div className="relative z-10">
+                                            <p className="text-slate-300 text-sm font-medium mb-1">Gasto Calórico Estimado</p>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-4xl font-bold tracking-tight">{results.calories}</span>
+                                                <span className="text-lg text-orange-400 font-semibold">kcal</span>
+                                            </div>
+                                            <p className="text-xs text-slate-400 mt-2">
+                                                ~ {results.weightLoss}g de perda estimada
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Cards Secundários */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        
+                                        {/* Velocidade ou Pace */}
+                                        {activityConfig[activity].metric === 'speed' ? (
+                                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex flex-col justify-center">
+                                                <div className="flex items-center gap-2 text-blue-600 mb-1">
+                                                    <IconZap className="w-4 h-4" />
+                                                    <span className="text-xs font-bold uppercase">Vel. Média</span>
+                                                </div>
+                                                <span className="text-2xl font-bold text-slate-800">
+                                                    {results.speed} <span className="text-sm font-normal text-slate-500">km/h</span>
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex flex-col justify-center">
+                                                <div className="flex items-center gap-2 text-orange-600 mb-1">
+                                                    <IconTimer className="w-4 h-4" />
+                                                    <span className="text-xs font-bold uppercase">Pace Médio</span>
+                                                </div>
+                                                <span className="text-2xl font-bold text-slate-800">
+                                                    {results.pace} <span className="text-sm font-normal text-slate-500">/km</span>
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Intensidade */}
+                                        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex flex-col justify-center">
+                                            <div className="flex items-center gap-2 text-emerald-600 mb-1">
+                                                <IconTrending className="w-4 h-4" />
+                                                <span className="text-xs font-bold uppercase">Intensidade</span>
+                                            </div>
+                                            <span className="text-lg font-bold text-slate-800">
+                                                {results.met > 8 ? 'Alta' : results.met > 5 ? 'Moderada' : 'Leve'}
+                                            </span>
+                                            <span className="text-xs text-slate-500">MET: {results.met}</span>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-slate-400">
+                                    <p>Preencha os dados acima para ver os resultados.</p>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="bg-slate-50 p-4 text-center border-t border-slate-200">
+                            <p className="text-[10px] text-slate-400">
+                                *Estimativas baseadas em METs padrão. Consulte um profissional.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<FitnessCalculator />);
+    </script>
+</body>
+</html>
